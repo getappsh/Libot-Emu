@@ -1,0 +1,63 @@
+stages:
+   - tag
+   - build
+   - deploy
+include:
+  - project: devops/modules/regular-modules/build
+    file: simple_microservice_build.yaml
+    ref: master
+  - project: devops/modules/regular-modules/trigger
+    file: trigger_devops_repo_from_microservice_develop_branch.yaml 
+    ref: master
+  - project: devops/modules/regular-modules/release-control
+    file: calculate_new_tag.yaml 
+    ref: master
+
+variables:
+  NEW_TAG: ""
+
+Calculate_new_tag: ##########
+  stage: tag
+  variables:
+    OTHER_PROJECT_ID: ${CI_PROJECT_ID} # it's 20, in this repo
+  extends:
+    - .calculate_new_tag
+  only:
+    - develop
+  except:
+    - tags
+
+
+Build and push docker image to harbor:
+  stage: build
+  before_script:
+    - export IMAGE_TAG=$(cat NEW_TAG.txt) 
+    - echo $IMAGE_TAG
+  ### after_script:
+  #   - docker run -e CI=true ${CI_REGISTRY}/${CI_REGISTRY_MICROSERVICE_IMAGE}:${IMAGE_TAG} --entry-point="npm run test"
+  dependencies:
+    - Calculate_new_tag
+  only:
+    - develop
+  except:
+    - tags
+  tags:
+    - shell
+  extends:
+    - .build_single_microservice_with_env
+
+
+# Trigger deploy:
+#   stage: deploy
+#   variables:
+#     DEVOPS_REPO_ID: 51 ## $DEVOPS_REPO_ID   ### Here should be the nuber for DevOps repo for the project
+#     CI_JOB_TOKEN: $CI_JOB_TOKEN       ### Here should be generated token to push DevOps repo
+#     DEVOPS_BRANCH: main        ### Need remove after test
+#   extends:
+#     - .trigger_devops_repo_to_deploy_develop_branch
+#   only:
+#     - develop
+#   except:
+#     - tags
+
+

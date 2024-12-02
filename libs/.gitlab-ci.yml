@@ -1,0 +1,43 @@
+stages:         
+  - commit
+
+variables:
+  VERSION_FILE: common/version.txt
+
+
+increment_version:
+    stage: commit
+
+    script:
+        - git config user.name "CI Pipeline"
+        - git config user.email "cipipeline@example.com"
+        - echo $CI_ACCESS_TOKEN
+        - git remote set-url --push gitlab_origin https://oauth2:$CI_ACCESS_TOKEN@gitlab.getapp.sh/getapp/getapp/api-dev/libs-g/libs.git
+        - current_version=$(< $VERSION_FILE)
+        - echo $current_version
+        - IFS='.' read -r -a version_parts <<< "$current_version"
+        - last_part=${version_parts[2]}
+        - new_last_part=$((last_part + 1))
+        - new_version="${version_parts[0]}.${version_parts[1]}.$new_last_part"
+        - echo $new_version
+        - echo $new_version > $VERSION_FILE
+        - git add $VERSION_FILE
+        - git commit -m "[CI SKIP] Increment version to $new_version"
+        - git tag $new_version
+        - git push --tags gitlab_origin HEAD:$CI_COMMIT_REF_NAME
+
+
+    tags:
+        - shell
+
+    rules:
+      - if: '$CI_COMMIT_REF_NAME == "even" || $CI_COMMIT_REF_NAME == "develop" || $CI_COMMIT_REF_NAME == "even-2"'
+      - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "develop"'
+        when: never
+
+    # except:
+    # - /^(\[CI SKIP\].*)$/
+        # only:
+    #     - develop
+    #     - even
+
